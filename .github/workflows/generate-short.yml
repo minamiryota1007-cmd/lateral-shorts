@@ -1,6 +1,10 @@
 name: Generate VOICEVOX short
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/script.json'
   workflow_dispatch:
     inputs:
       speaker:
@@ -28,7 +32,7 @@ jobs:
           docker run -d --name voicevox -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest
       - name: Generate narrated vertical MP4
         env:
-          VOICEVOX_SPEAKER: ${{ inputs.speaker }}
+          VOICEVOX_SPEAKER: ${{ inputs.speaker || '3' }}
         run: python scripts/generate.py
       - name: Upload preview (not published)
         uses: actions/upload-artifact@v4
