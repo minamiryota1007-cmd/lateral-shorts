@@ -120,6 +120,37 @@ def draw_scene(draw, scene, accent):
         draw.rectangle((0, 680, 720, 1030), fill=(40, 90, 120))
         for x, h in ((35, 170), (145, 260), (270, 140), (395, 320), (535, 215)):
             draw.rectangle((x, 680-h, x+100, 900), fill=(33, 68, 100))
+    elif scene == "shoes":
+        for j, (x, y) in enumerate(((100, 345), (365, 450), (120, 590))):
+            draw.ellipse((x+8, y+65, x+205, y+170), fill=(28, 46, 64))
+            draw.polygon([(x+10, y+110), (x+65, y+32), (x+140, y+55),
+                          (x+162, y+110), (x+220, y+135), (x+220, y+165),
+                          (x+15, y+165)], fill=(69+j*30, 172-j*15, 188))
+            draw.line((x+15, y+160, x+215, y+160), fill=(240, 239, 218), width=11)
+            for k in range(3):
+                draw.line((x+90+k*17, y+83, x+106+k*17, y+94), fill="white", width=5)
+    elif scene == "shoe_line":
+        draw.line((35, 670, 685, 670), fill=accent, width=12)
+        for j in range(5):
+            x=45+j*135
+            draw.polygon([(x, 600), (x+28, 555), (x+62, 575),
+                          (x+75, 613), (x+105, 630), (x+105, 651), (x, 651)],
+                         fill=(74, 177, 188))
+            draw.line((x, 650, x+105, 650), fill="white", width=7)
+    elif scene == "earth":
+        draw.ellipse((130, 295, 590, 755), fill=(53, 136, 186), outline=accent, width=12)
+        draw.polygon([(230, 360), (330, 330), (390, 405), (340, 490),
+                      (400, 540), (320, 655), (245, 570), (260, 470)],
+                     fill=(74, 182, 136))
+        draw.polygon([(455, 340), (535, 415), (490, 480), (540, 550),
+                      (465, 650), (420, 570), (445, 490)], fill=(74, 182, 136))
+        draw.arc((80, 260, 640, 790), 15, 345, fill=(255, 218, 112), width=15)
+    elif scene == "japan":
+        draw.polygon([(465, 300), (490, 340), (462, 400), (442, 475),
+                      (405, 550), (355, 610), (302, 685), (265, 720),
+                      (240, 685), (280, 640), (340, 575), (380, 495),
+                      (420, 410)], fill=(77, 188, 155))
+        draw.ellipse((180, 740, 255, 815), fill=(77, 188, 155))
     elif scene == "question":
         question_font = ImageFont.truetype(FONT, 370)
         draw.text((245, 280), "？", font=question_font, fill=accent)
