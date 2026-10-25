@@ -1,0 +1,20 @@
+{
+  "name": "lateral-shorts-v7",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "studio": "remotion studio src/index.tsx",
+    "render": "remotion render src/index.tsx LateralV7 out/lateral_v7.mp4 --codec=h264 --concurrency=2"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "remotion": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0"
+  }
+}
