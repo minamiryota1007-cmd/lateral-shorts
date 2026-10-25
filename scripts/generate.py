@@ -244,7 +244,7 @@ def main():
         make_card(text, i, len(segments), png, segment.get("scene", "clock"), segment.get("headline", ""))
         seconds = duration(wav) + 0.45
         run("ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(png),
-            "-i", str(wav), "-filter_complex", "[0:v]scale=792:1408,zoompan=z='min(zoom+0.0007,1.10)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=720x1280:fps=30,format=yuv420p[v];[1:a]apad[a]",
+            "-i", str(wav), "-filter_complex", "[0:v]scale=792:1408,zoompan=z='min(zoom+0.0012,1.15)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=720x1280:fps=30,drawbox=x=60:y=1080:w='min(600,t*160)':h=9:color=yellow@0.85:t=fill,format=yuv420p[v];[1:a]apad[a]",
             "-map", "[v]", "-map", "[a]", "-t", f"{seconds:.3f}",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac",
