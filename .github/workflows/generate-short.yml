@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - 'scripts/script.json'
+      - 'scripts/generate.py'
+      - '.github/workflows/generate-short.yml'
   workflow_dispatch:
     inputs:
       speaker:
