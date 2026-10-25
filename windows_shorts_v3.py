@@ -99,7 +99,11 @@ def get_pixabay(shot):
                 },
                 timeout=25,
             )
-            response.raise_for_status()
+            if response.status_code != 200:
+                # Never print response.url: it includes the private API key.
+                detail = response.text[:300].replace(key, "[REDACTED]")
+                print(f"Pixabay HTTP {response.status_code}: {detail}")
+                return None
             payload = response.json()
             cache.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
         candidates = []
@@ -130,7 +134,7 @@ def get_pixabay(shot):
         return dest
     except Exception as exc:
         dest.unlink(missing_ok=True)
-        print("Pixabay unavailable:", shot, exc)
+        print("Pixabay unavailable:", shot, str(exc).replace(key, "[REDACTED]"))
         return None
 
 def get_pexels(shot):
@@ -163,7 +167,7 @@ def get_pexels(shot):
         print("Downloaded Pexels footage:", shot)
         return dest
     except Exception as exc:
-        print("Pexels unavailable:", shot, exc)
+        print("Pexels unavailable:", shot, str(exc).replace(key, "[REDACTED]"))
         return None
 
 def photo_fallback(shot):
