@@ -8,7 +8,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageOps, ImageEnhance
+from io import BytesIO
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("VOICEVOX_URL", "http://127.0.0.1:50021").rstrip("/")
@@ -166,11 +167,35 @@ def draw_scene(draw, scene, accent):
             draw.ellipse((x-r, y-r, x+r, y+r), outline=accent, width=12)
 
 
+PHOTO_URLS = {
+    "earth": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200&q=85",
+    "people": "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=1200&q=85",
+    "japan": "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=1200&q=85",
+    "chart": "https://images.unsplash.com/photo-1500534623283-312aade485b7?w=1200&q=85",
+    "question": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1200&q=85",
+}
+
+def cinematic_background(scene):
+    url = PHOTO_URLS.get(scene, PHOTO_URLS["earth"])
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        with urllib.request.urlopen(req, timeout=30) as response:
+            photo = Image.open(BytesIO(response.read())).convert("RGB")
+        photo = ImageOps.fit(photo, (WIDTH, HEIGHT))
+        photo = ImageEnhance.Color(photo).enhance(0.72)
+        photo = ImageEnhance.Contrast(photo).enhance(1.25)
+        photo = ImageEnhance.Brightness(photo).enhance(0.55)
+        return photo
+    except Exception as exc:
+        print(f"Background unavailable: {exc}")
+        return Image.new("RGB", (WIDTH, HEIGHT), (10, 21, 36))
+
+
 def make_card(text, number, total, output, scene="clock", headline=""):
-    image = Image.new("RGB", (WIDTH, HEIGHT), (13, 26, 48))
+    image = cinematic_background(scene)
     draw = ImageDraw.Draw(image)
-    accent = (75, 224, 196)
-    draw_scene(draw, scene, accent)
+    accent = (255, 207, 78)
+    # Full-bleed photographic backdrop; no flat clip-art.
     # Topic-specific environmental details: perspective, texture and labels.
     if scene == "earth":
         for ring in range(3):
@@ -218,7 +243,7 @@ def make_card(text, number, total, output, scene="clock", headline=""):
     for line in lines:
         bbox = draw.textbbox((0, 0), line, font=font)
         x = (WIDTH - (bbox[2] - bbox[0])) // 2
-        draw.text((x, y), line, font=font, fill="white")
+        draw.text((x, y), line, font=font, fill="white", stroke_width=3, stroke_fill=(0, 0, 0))
         y += line_height
     draw.text((54, 1125), f"{number:02d} / {total:02d}", font=small, fill=accent)
     draw.rounded_rectangle((54, 1190, 666, 1201), radius=5, fill=(48, 76, 95))
