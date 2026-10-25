@@ -170,6 +170,31 @@ def make_card(text, number, total, output, scene="clock", headline=""):
     draw = ImageDraw.Draw(image)
     accent = (75, 224, 196)
     draw_scene(draw, scene, accent)
+    # Topic-specific environmental details: perspective, texture and labels.
+    if scene == "earth":
+        for ring in range(3):
+            inset = ring * 25
+            draw.arc((65+inset, 250+inset, 655-inset, 825-inset),
+                     195, 345, fill=(69+ring*30, 174+ring*12, 203), width=4)
+        draw.ellipse((545, 430, 590, 475), fill=(255, 220, 115))
+        draw.text((90, 660), "EARTH / 40,000 km", font=ImageFont.truetype(FONT, 25),
+                  fill=(193, 227, 235))
+    elif scene == "japan":
+        for x,y in ((155,420),(565,480),(135,660),(545,690)):
+            draw.ellipse((x-24,y-24,x+24,y+24), fill=(59, 160, 181))
+            draw.ellipse((x-9,y-35,x+9,y-17), fill=(255, 224, 146))
+        draw.text((120, 825), "POPULATION / 120,000,000",
+                  font=ImageFont.truetype(FONT, 23), fill=(196, 230, 235))
+    elif scene in ("shoes", "shoe_line"):
+        for y in (380, 420, 460):
+            draw.line((40,y,680,y), fill=(25, 60, 78), width=2)
+        for x in range(60,680,60):
+            draw.line((x,370,x,700), fill=(25, 60, 78), width=2)
+        draw.text((85, 710), "1 SHOE = 25 cm", font=ImageFont.truetype(FONT, 27),
+                  fill=(255, 216, 120))
+    elif scene == "question":
+        for x,y in ((115,410),(565,440),(130,640),(590,680)):
+            draw.ellipse((x-14,y-14,x+14,y+14), fill=(255, 215, 112))
     # Keep visuals above the caption, not hidden behind an oversized text box.
     draw.rounded_rectangle((28, 735, 692, 1065), radius=32, fill=(11, 24, 43))
     draw.rounded_rectangle((42, 93, 678, 105), radius=6, fill=accent)
