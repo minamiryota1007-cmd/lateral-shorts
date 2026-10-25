@@ -79,7 +79,7 @@ def get_pexels(shot):
     if dest.exists() and dest.stat().st_size > 100000:
         return dest
     try:
-        r = requests.get("https://api.pexels.com/videos/search",
+        r = requests.get("https://api.pexels.com/v1/videos/search",
                          params={"query": SEARCHES[shot], "per_page": 8, "orientation": "portrait"},
                          headers={"Authorization": key}, timeout=25)
         r.raise_for_status()
