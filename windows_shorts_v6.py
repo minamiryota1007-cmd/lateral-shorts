@@ -1,0 +1,427 @@
+#!/usr/bin/env python3
+"""Lateral Shorts V6: voice-synced 30fps cinematic Fermi Shorts (Windows)."""
+import os, math, json, wave, shutil, subprocess, tempfile
+from pathlib import Path
+from urllib.parse import quote
+import cv2
+import numpy as np
+import requests
+import imageio_ffmpeg
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
+
+HOME = Path.home()
+ROOT = HOME / "Videos" / "lateral_shorts_assets"
+ROOT.mkdir(parents=True, exist_ok=True)
+OUTPUT = HOME / "lateral_shorts_v6.mp4"
+FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
+VOICE = os.getenv("VOICEVOX_URL", "http://127.0.0.1:50021").rstrip("/")
+SPEAKER = None
+VOICE_CREDIT = "VOICEVOX:青山龍星"
+W, H, FPS = 540, 960, 30
+SCENES = [
+    dict(shot="tobacco", label="1日1箱を50年間", big="1,095万円!?", sub="タバコ代は生涯いくら？",
+         caption="タバコ1日1箱。50年でいくら？", speech="たばこを毎日ひとはこ。五十年続けると、いくらになるでしょう。"),
+    dict(shot="tobacco", label="まずは1箱の値段", big="600円", sub="1箱600円として試算",
+         caption="1箱600円で計算", speech="まず、ひとはこ六百円で計算します。"),
+    dict(shot="wallet", label="1年間で", big="219,000円", sub="600円 × 365日",
+         caption="600円 × 365日 ＝ 219,000円", speech="一年間では、二十一万九千円。"),
+    dict(shot="money", label="50年間では", big="10,950,000円", sub="600円 × 365日 × 50年",
+         caption="50年間で1,095万円", speech="五十年間なら、一千九十五万円です。"),
+    dict(shot="clock", label="時間も計算すると", big="約30,417時間", sub="1本5分 × 20本 × 365日 × 50年",
+         caption="吸っている時間は約30,417時間", speech="一本五分なら、吸っている時間は約三万時間。"),
+    dict(shot="tobacco", label="1箱の税金に注目", big="約359円", sub="たばこ税等約305円＋消費税約55円",
+         caption="販売価格600円に含まれる税金は約359円", speech="さらに、ひとはこに含まれる税金は、約三百五十九円。"),
+    dict(shot="tax", label="50年間の税負担", big="約656万円", sub="（約304.88円＋約54.55円）× 365日 × 50年",
+         caption="50年で税金約656万円。追加支出ではありません。",
+         speech="五十年間で、税金だけでも約六百五十六万円。"),
+    dict(shot="travel", label="あなたなら何に使う？", big="1,095万円", sub="支出の価値は人それぞれ",
+         caption="あなたなら1,095万円、何に使う？",
+         speech="この選択を、あなたならどう考えますか。"),
+]
+SEARCHES = {
+    "tobacco": "cigarette smoke ashtray smoking cigarettes",
+    "wallet": "cigarette pack money cash",
+    "money": "stack of cash money banknotes",
+    "clock": "wall clock time lapse",
+    "tax": "receipt tax bill money",
+    "travel": "money travel vacation beach",
+}
+PHOTOS = {
+    "tobacco": "photo-1574068468668-a05a11f871da",
+    "wallet": "photo-1554224155-6726b3ff858f",
+    "money": "photo-1579621970563-ebec7560ff3e",
+    "clock": "photo-1501139083538-0139583c060f",
+    "tax": "photo-1554224154-26032ffc0d07",
+    "travel": "photo-1488646953014-85cb44e25828",
+}
+
+def font(size, bold=True):
+    candidates = (["meiryob.ttc", "YuGothB.ttc", "meiryo.ttc"] if bold
+                  else ["meiryo.ttc", "YuGothM.ttc"])
+    for item in candidates:
+        p = Path("C:/Windows/Fonts") / item
+        if p.exists():
+            return ImageFont.truetype(str(p), size)
+    raise RuntimeError("Japanese font not found. Install Meiryo or Yu Gothic.")
+
+def voice_file(text, path):
+    q = requests.post(VOICE + "/audio_query",
+                      params={"text": text, "speaker": SPEAKER}, timeout=45)
+    q.raise_for_status()
+    data = q.json()
+    data["speedScale"] = 1.02
+    data["pitchScale"] = -0.035
+    data["intonationScale"] = 0.97
+    # Do not accelerate whole audio to artificially fit the target.
+    a = requests.post(VOICE + "/synthesis",
+                      params={"speaker": SPEAKER}, json=data, timeout=90)
+    a.raise_for_status()
+    path.write_bytes(a.content)
+    with wave.open(str(path), "rb") as f:
+        return f.getnframes() / f.getframerate()
+
+
+def get_pixabay(shot):
+    """Optional Pixabay video, using a key from the local PC only."""
+    key = os.getenv("PIXABAY_API_KEY", "").strip()
+    if not key:
+        return None
+    dest = ROOT / (shot + "_pixabay.mp4")
+    if dest.exists() and dest.stat().st_size > 100000:
+        return dest
+    # Search metadata is cached for at least 24 hours per Pixabay API policy.
+    from datetime import datetime, timezone
+    cache = ROOT / (shot + "_pixabay_search.json")
+    try:
+        payload = None
+        if cache.exists() and (datetime.now(timezone.utc).timestamp() - cache.stat().st_mtime) < 86400:
+            payload = json.loads(cache.read_text(encoding="utf-8"))
+        if payload is None:
+            response = requests.get(
+                "https://pixabay.com/api/videos/",
+                params={
+                    "key": key,
+                    "q": SEARCHES[shot],
+                    "video_type": "film",
+                    "safesearch": "true",
+                    "per_page": 5,
+                },
+                timeout=25,
+            )
+            if response.status_code != 200:
+                # Never print response.url: it includes the private API key.
+                detail = response.text[:300].replace(key, "[REDACTED]")
+                print(f"Pixabay HTTP {response.status_code}: {detail}")
+                return None
+            payload = response.json()
+            cache.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        candidates = []
+        for hit in payload.get("hits", []):
+            renditions = hit.get("videos", {})
+            item = renditions.get("medium") or renditions.get("small") or {}
+            if not item.get("url"):
+                continue
+            w, h = item.get("width", 0), item.get("height", 0)
+            # Favour vertical media but crop landscape clips when necessary.
+            score = (2 if h > w else 0) + (1 if min(w, h) >= 540 else 0)
+            candidates.append((score, hit, item))
+        if not candidates:
+            print("No Pixabay footage for:", shot)
+            return None
+        _, chosen, item = sorted(candidates, key=lambda e: e[0], reverse=True)[0]
+        with requests.get(item["url"], stream=True, timeout=60) as download:
+            download.raise_for_status()
+            with dest.open("wb") as output:
+                total = 0
+                for block in download.iter_content(128 * 1024):
+                    if block:
+                        total += len(block)
+                        if total > 120 * 1024 * 1024:
+                            raise RuntimeError("Pixabay download exceeds 120 MB")
+                        output.write(block)
+        print("Downloaded Pixabay footage:", shot, "source:", chosen.get("pageURL", ""))
+        return dest
+    except Exception as exc:
+        dest.unlink(missing_ok=True)
+        print("Pixabay unavailable:", shot, str(exc).replace(key, "[REDACTED]"))
+        return None
+
+def get_pexels(shot):
+    key = os.getenv("PEXELS_API_KEY", "").strip()
+    if not key:
+        return None
+    dest = ROOT / (shot + ".mp4")
+    if dest.exists() and dest.stat().st_size > 100000:
+        return dest
+    try:
+        r = requests.get("https://api.pexels.com/v1/videos/search",
+                         params={"query": SEARCHES[shot], "per_page": 8, "orientation": "portrait"},
+                         headers={"Authorization": key}, timeout=25)
+        r.raise_for_status()
+        results = r.json().get("videos", [])
+        candidates = []
+        for video in results:
+            for f in video.get("video_files", []):
+                if f.get("link") and f.get("width", 0) >= 540 and f.get("height", 0) > f.get("width", 0):
+                    candidates.append((f.get("width", 0), f["link"]))
+        if not candidates:
+            print("No portrait video found for", shot)
+            return None
+        url = sorted(candidates, key=lambda x: x[0])[0][1]
+        with requests.get(url, stream=True, timeout=50) as response:
+            response.raise_for_status()
+            with dest.open("wb") as file:
+                for block in response.iter_content(128*1024):
+                    file.write(block)
+        print("Downloaded Pexels footage:", shot)
+        return dest
+    except Exception as exc:
+        print("Pexels unavailable:", shot, str(exc).replace(key, "[REDACTED]"))
+        return None
+
+def photo_fallback(shot):
+    dest = ROOT / (shot + ".jpg")
+    if dest.exists():
+        try:
+            return Image.open(dest).convert("RGB")
+        except Exception:
+            dest.unlink()
+    url = "https://images.unsplash.com/" + PHOTOS[shot] + "?w=1000&q=82"
+    try:
+        r = requests.get(url, timeout=20)
+        r.raise_for_status()
+        dest.write_bytes(r.content)
+        return Image.open(dest).convert("RGB")
+    except Exception as exc:
+        print("Photo fallback unavailable:", shot, exc)
+        return None
+
+def fit_image(im, progress):
+    # Gentle Ken Burns zoom; photo itself does not become AI video.
+    im = ImageOps.fit(im, (W+110, H+180))
+    z = 1.0 + .065 * progress
+    crop_w = int(W / z)
+    crop_h = int(H / z)
+    center_x = im.width // 2 + int(14*(progress-.5))
+    center_y = im.height // 2 + int(20*(progress-.5))
+    left = max(0, min(im.width-crop_w, center_x-crop_w//2))
+    top = max(0, min(im.height-crop_h, center_y-crop_h//2))
+    return im.crop((left, top, left+crop_w, top+crop_h)).resize((W,H), Image.Resampling.BILINEAR)
+
+def safe_lines(draw, text, f, max_width=465):
+    lines, cur = [], ""
+    for ch in text:
+        candidate = cur + ch
+        if cur and draw.textbbox((0,0), candidate, font=f)[2] > max_width:
+            lines.append(cur)
+            cur = ch
+        else:
+            cur = candidate
+    if cur:
+        lines.append(cur)
+    return lines
+
+def paint(back, sc, t, duration, idx, actual_voice):
+    """Frame-by-frame animated numerical storytelling, not static slides."""
+    import re
+    p = max(0.0, min(1.0, t / max(duration, .001)))
+    fade = min(1.0, t / .30, (duration-t) / .24 if duration-t < .24 else 1.0)
+    fade = max(0.0, fade)
+    im = Image.fromarray(cv2.cvtColor(back, cv2.COLOR_BGR2RGB)).convert("RGBA")
+    im = Image.alpha_composite(im, Image.new("RGBA", (W,H),(6,10,22,100)))
+    layer = Image.new("RGBA",(W,H),(0,0,0,0))
+    d = ImageDraw.Draw(layer)
+    gold=(255,209,77,255)
+    red=(255,83,77,255)
+    white=(248,250,252,255)
+    accent=red if idx in (5,6) else gold
+    # Timed editorial layout: animated header / equation / large outcome.
+    d.rounded_rectangle((23,52,517,62),radius=4,fill=accent)
+    d.text((29,91),"ラテラルシンキング  |  もしも計算",font=font(23),fill=white)
+    d.rounded_rectangle((22,188,518,545),radius=24,fill=(8,12,27,170))
+    d.text((40,220),sc["label"],font=font(29),fill=white)
+    text=sc["big"]
+    # Animate numeric count-up while preserving prefix/suffix, e.g. 10,950,000円.
+    match=re.search(r"([0-9][0-9,]*)",text)
+    if match:
+        target=int(match.group(1).replace(",",""))
+        advance=max(0.0,min(1.0,(t-.18)/.85))
+        eased=1-(1-advance)**3
+        shown=f"{round(target*eased):,}"
+        if t>=1.04:
+            shown=f"{target:,}"
+        text=text[:match.start()]+shown+text[match.end():]
+    size=64
+    while size>27 and d.textbbox((0,0),text,font=font(size))[2]>459:
+        size-=2
+    swing=1+.035*math.sin(min(1,t/.38)*math.pi)
+    headline_font=font(round(size*swing))
+    text_w=d.textbbox((0,0),text,font=headline_font)[2]
+    d.text(((W-text_w)//2,330),text,font=headline_font,fill=accent,stroke_width=2,stroke_fill=(0,0,0,255))
+    subfont=font(24)
+    for k,line in enumerate(safe_lines(d,sc["sub"],subfont,444)[:2]):
+        d.text((37,452+k*35),line,font=subfont,fill=white)
+    # Readable calculation progress segments beneath the numerical result.
+    steps=5
+    for step in range(steps):
+        x0=35+step*98
+        d.rounded_rectangle((x0,570,x0+86,582),radius=5,
+                            fill=accent if p>=step/steps else (87,100,120,210))
+    if idx==4:
+        # Clock hands: actual moving hands to represent accumulated hours.
+        cx,cy=447,640
+        d.ellipse((cx-32,cy-32,cx+32,cy+32),outline=gold,width=3)
+        ang=2*math.pi*(t*1.7)
+        d.line((cx,cy,cx+int(26*math.sin(ang)),cy-int(26*math.cos(ang))),fill=white,width=3)
+        d.line((cx,cy,cx+int(17*math.sin(ang/12)),cy-int(17*math.cos(ang/12))),fill=red,width=4)
+    elif idx in (3,6):
+        # Amount visualizer: illustrated money stacks increase as scene plays.
+        for n in range(12):
+            bh=int((10+n*3)*min(1,(t*2+n/12)))
+            x=35+n*32
+            d.rectangle((x,661-bh,x+24,661),fill=(220,184,70,150+n*7))
+    if t<=actual_voice+.3:
+        d.rounded_rectangle((25,706,515,823),radius=20,fill=(5,10,26,211))
+        capfont=font(26)
+        lines=safe_lines(d,sc["caption"],capfont,455)
+        for k,line in enumerate(lines[:3]):
+            d.text((38,727+k*33),line,font=capfont,fill=white)
+    d.text((28,854),f"{idx+1:02d}/{len(SCENES):02d}",font=font(22),fill=accent)
+    d.text((263,854),VOICE_CREDIT,font=font(17),fill=white)
+    d.rounded_rectangle((28,907,512,915),radius=3,fill=(70,77,92,255))
+    d.rounded_rectangle((28,907,28+int(484*p),915),radius=3,fill=accent)
+    if fade < 1:
+        layer.putalpha(int(255*fade))
+    return cv2.cvtColor(np.asarray(Image.alpha_composite(im,layer).convert("RGB")),cv2.COLOR_RGB2BGR)
+
+def render_scene(ffmpeg, sc, idx, duration, voice_sec, voice_path, work):
+    shot=sc["shot"]
+    user_clips = sorted((ROOT / shot).glob("*.mp4")) if (ROOT / shot).is_dir() else []
+    direct = ROOT / (shot+".mp4")
+    footage = (user_clips[0] if user_clips else
+               direct if direct.exists() else (get_pixabay(shot) or get_pexels(shot)))
+    cap = cv2.VideoCapture(str(footage)) if footage else None
+    photo = None if cap and cap.isOpened() else photo_fallback(shot)
+    mode = "REAL VIDEO" if cap and cap.isOpened() else "PHOTO MOTION" if photo else "ANIMATED GRADIENT"
+    print(f"  scene {idx+1}: {mode}, {duration:.2f}s")
+    out=work/f"{idx:02d}.mp4"
+    args=[ffmpeg,"-hide_banner","-loglevel","error","-y",
+          "-f","rawvideo","-vcodec","rawvideo","-pix_fmt","bgr24",
+          "-s",f"{W}x{H}","-r",str(FPS),"-i","-",
+          "-i",str(voice_path),"-filter_complex",
+          "[0:v]scale=1080:1920:flags=lanczos,format=yuv420p[v];[1:a]apad[a]",
+          "-map","[v]","-map","[a]","-t",f"{duration:.3f}",
+          "-c:v","libx264","-preset","veryfast","-crf","20",
+          "-r",str(FPS),"-c:a","aac","-b:a","128k",str(out)]
+    proc = subprocess.Popen(args, stdin=subprocess.PIPE)
+    count=round(duration*FPS)
+    try:
+        for n in range(count):
+            t=n/FPS
+            if cap and cap.isOpened():
+                success,bg=cap.read()
+                if not success:
+                    cap.set(cv2.CAP_PROP_POS_FRAMES,0)
+                    success,bg=cap.read()
+                if success:
+                    bh, bw = bg.shape[:2]
+                    # Center crop video rather than stretching the source.
+                    target = W / H
+                    if bw / bh > target:
+                        cw = int(bh * target)
+                        bg = bg[:, (bw-cw)//2:(bw+cw)//2]
+                    else:
+                        ch = int(bw / target)
+                        bg = bg[(bh-ch)//2:(bh+ch)//2, :]
+                    bg=cv2.resize(bg,(W,H),interpolation=cv2.INTER_LINEAR)
+                else:
+                    cap.release()
+                    cap=None
+                    photo=photo_fallback(shot)
+            if not cap:
+                if photo:
+                    bg=cv2.cvtColor(np.asarray(fit_image(photo,t/duration)),cv2.COLOR_RGB2BGR)
+                else:
+                    bg=np.zeros((H,W,3),dtype=np.uint8)
+                    k=t/duration
+                    bg[:,:,0]=np.clip(55+10*math.sin(k*6),0,255)
+                    bg[:,:,1]=np.linspace(35,70,H,dtype=np.uint8)[:,None]
+                    bg[:,:,2]=np.linspace(18,48,H,dtype=np.uint8)[:,None]
+            frame=paint(bg,sc,t,duration,idx,voice_sec)
+            proc.stdin.write(frame.tobytes())
+    except Exception:
+        proc.kill()
+        raise
+    finally:
+        if cap:
+            cap.release()
+        try:
+            proc.stdin.close()
+        except Exception:
+            pass
+    if proc.wait()!=0:
+        raise RuntimeError("FFmpeg failed on scene "+str(idx+1))
+    return out
+
+def select_voice():
+    global SPEAKER, VOICE_CREDIT
+    requested = os.getenv("VOICEVOX_SPEAKER", "").strip()
+    speakers = requests.get(VOICE + "/speakers", timeout=15)
+    speakers.raise_for_status()
+    entries = speakers.json()
+    if requested:
+        for person in entries:
+            for style in person.get("styles", []):
+                if int(style["id"]) == int(requested):
+                    SPEAKER = int(requested)
+                    VOICE_CREDIT = "VOICEVOX:" + person["name"]
+                    print("Voice:", VOICE_CREDIT, SPEAKER)
+                    return
+        raise RuntimeError("Unknown VOICEVOX_SPEAKER ID: " + requested)
+    for person in entries:
+        if "青山龍星" in person.get("name", ""):
+            styles = person.get("styles", [])
+            selected = next((v for v in styles if v.get("name") == "ノーマル"), styles[0] if styles else None)
+            if selected:
+                SPEAKER = int(selected["id"])
+                print("Voice:", VOICE_CREDIT, SPEAKER)
+                return
+    raise RuntimeError("青山龍星 is not installed. Add this VOICEVOX character or set VOICEVOX_SPEAKER.")
+
+def main():
+    try:
+        r=requests.get(VOICE+"/version",timeout=4)
+        r.raise_for_status()
+        print("VOICEVOX connected:",r.text)
+        select_voice()
+    except requests.RequestException as e:
+        raise SystemExit("VOICEVOX is not running. Launch the VOICEVOX app first.") from e
+    with tempfile.TemporaryDirectory() as td:
+        work=Path(td)
+        lengths=[]
+        audios=[]
+        for i,sc in enumerate(SCENES):
+            wav=work/f"voice_{i:02d}.wav"
+            length=voice_file(sc["speech"],wav)
+            lengths.append(length)
+            audios.append(wav)
+        base=[x+.28 for x in lengths]
+        if sum(base)<=30:
+            extra=(30-sum(base))/len(base)
+            durations=[v+extra for v in base]
+        else:
+            durations=base
+            print(f"Natural reading takes {sum(durations):.1f}s; preserving clear speech rather than accelerating.")
+        print("Creating",round(sum(durations)*FPS),"animated frames with numerical motion graphics...")
+        clips=[render_scene(FFMPEG,s,i,durations[i],lengths[i],audios[i],work)
+               for i,s in enumerate(SCENES)]
+        manifest=work/"concat.txt"
+        manifest.write_text("".join(f"file '{p.name}'\n" for p in clips),encoding="utf-8")
+        subprocess.run([FFMPEG,"-hide_banner","-loglevel","error","-y",
+                        "-f","concat","-safe","0","-i",str(manifest),
+                        "-c","copy","-movflags","+faststart",str(OUTPUT)],
+                       cwd=str(work),check=True)
+    print("SUCCESS:",OUTPUT)
+    print("Review final audio and visuals before publishing. Pixabay footage is optional.")
+if __name__=="__main__":
+    main()
