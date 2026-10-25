@@ -223,7 +223,7 @@ def make_card(text, number, total, output, scene="clock", headline=""):
     draw.rounded_rectangle((54, 1190, 666, 1201), radius=5, fill=(48, 76, 95))
     draw.rounded_rectangle((54, 1190, 54 + int(612*number/total), 1201), radius=5, fill=accent)
     credit = ImageFont.truetype(FONT, 20)
-    draw.text((380, 1128), "VOICEVOX:ずんだもん", font=credit, fill=(165, 184, 195))
+    draw.text((380, 1128), "VOICEVOX:春日部つむぎ", font=credit, fill=(165, 184, 195))
     image.save(output)
 
 
@@ -241,7 +241,7 @@ def duration(path):
 
 def main():
     script = json.loads((ROOT / "scripts" / "script.json").read_text(encoding="utf-8"))
-    speaker = int(os.environ.get("VOICEVOX_SPEAKER", "3"))
+    speaker = int(os.environ.get("VOICEVOX_SPEAKER", "8"))
     segments = script["segments"]
     if not 1 <= len(segments) <= 12:
         raise ValueError("segments must contain 1 to 12 entries")
