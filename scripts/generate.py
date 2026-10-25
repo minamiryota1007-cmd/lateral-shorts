@@ -35,36 +35,86 @@ def synthesize(text, speaker, output):
     output.write_bytes(request("/synthesis?" + params, query))
 
 
-def lines_for(text, max_chars=13):
-    lines = []
-    for paragraph in text.split("\n"):
-        while len(paragraph) > max_chars:
-            lines.append(paragraph[:max_chars])
-            paragraph = paragraph[max_chars:]
-        lines.append(paragraph)
-    return lines
+def wrap_text(draw, text, font, max_width=590):
+    result = []
+    for paragraph in text.split("\\n"):
+        line = ""
+        for char in paragraph:
+            trial = line + char
+            if line and draw.textbbox((0, 0), trial, font=font)[2] > max_width:
+                result.append(line)
+                line = char
+            else:
+                line = trial
+        if line:
+            result.append(line)
+    return result
 
 
-def make_card(text, number, total, output):
+def draw_scene(draw, scene, accent):
+    # Original vector illustrations: no third-party imagery or paid API.
+    if scene == "train":
+        draw.rounded_rectangle((80, 310, 640, 860), radius=65, fill=(54, 104, 142), outline=accent, width=9)
+        draw.rounded_rectangle((125, 390, 595, 650), radius=22, fill=(127, 186, 202))
+        draw.line((360, 390, 360, 650), fill=(20, 56, 82), width=14)
+        draw.ellipse((150, 715, 205, 770), fill=(255, 233, 170))
+        draw.ellipse((515, 715, 570, 770), fill=(255, 233, 170))
+        draw.line((115, 895, 605, 895), fill=accent, width=13)
+    elif scene == "road":
+        draw.polygon([(255, 275), (465, 275), (720, 1120), (0, 1120)], fill=(52, 80, 101))
+        for y in range(350, 1080, 145):
+            draw.rounded_rectangle((350, y, 370, y + 70), radius=8, fill=(255, 221, 122))
+        draw.rounded_rectangle((145, 740, 575, 975), radius=50, fill=(47, 164, 179))
+        draw.rounded_rectangle((205, 770, 515, 840), radius=18, fill=(170, 218, 227))
+        for x in (240, 485):
+            draw.ellipse((x - 48, 935, x + 48, 1031), fill=(19, 34, 51))
+    elif scene == "clock":
+        draw.ellipse((120, 330, 600, 810), fill=(56, 103, 131), outline=accent, width=19)
+        draw.line((360, 570, 360, 405), fill="white", width=17)
+        draw.line((360, 570, 485, 635), fill="white", width=17)
+        draw.ellipse((340, 550, 380, 590), fill=accent)
+        for angle in range(0, 360, 30):
+            import math
+            a = math.radians(angle)
+            x = 360 + 205 * math.sin(a)
+            y = 570 - 205 * math.cos(a)
+            draw.ellipse((x-7, y-7, x+7, y+7), fill="white")
+    elif scene == "office":
+        for x, top, width in ((55, 480, 185), (265, 300, 190), (475, 405, 185)):
+            draw.rectangle((x, top, x + width, 1000), fill=(46, 92, 120), outline=accent, width=4)
+            for wx in range(x + 25, x + width - 10, 55):
+                for wy in range(top + 45, 960, 75):
+                    draw.rectangle((wx, wy, wx + 28, wy + 36), fill=(127, 189, 204))
+    else:
+        for x, y, r in ((155, 460, 95), (525, 590, 130), (300, 800, 65)):
+            draw.ellipse((x-r, y-r, x+r, y+r), outline=accent, width=12)
+
+
+def make_card(text, number, total, output, scene="clock", headline=""):
     image = Image.new("RGB", (WIDTH, HEIGHT), (13, 26, 48))
-    draw = ImageDraw.Draw(image)
-    accent = (70, 220, 197)
-    draw.rounded_rectangle((46, 85, 674, 105), radius=10, fill=accent)
-    font = ImageFont.truetype(FONT, 57)
-    small = ImageFont.truetype(FONT, 30)
-    draw.text((54, 135), "ラテラルシンキング", font=small, fill=accent)
-    lines = lines_for(text)
-    spacing = 24
-    boxes = [draw.textbbox((0, 0), line, font=font) for line in lines]
-    heights = [b[3] - b[1] for b in boxes]
-    total_height = sum(heights) + spacing * (len(lines) - 1)
-    y = (HEIGHT - total_height) // 2
-    for line, h in zip(lines, heights):
-        box = draw.textbbox((0, 0), line, font=font)
-        x = (WIDTH - (box[2] - box[0])) // 2
-        draw.text((x, y), line, font=font, fill="white", stroke_width=1)
-        y += h + spacing
-    draw.text((54, 1160), f"{number:02d} / {total:02d}", font=small, fill=accent)
+    draw = ImageDraw.Draw(image, "RGB")
+    accent = (75, 224, 196)
+    draw_scene(draw, scene, accent)
+    # Dim illustration behind opaque subtitle panel for readability.
+    draw.rounded_rectangle((35, 420, 685, 850), radius=38, fill=(12, 23, 42))
+    draw.rounded_rectangle((42, 92, 678, 103), radius=5, fill=accent)
+    small = ImageFont.truetype(FONT, 29)
+    draw.text((54, 132), "ラテラルシンキング", font=small, fill=accent)
+    font_size = 59
+    while True:
+        font = ImageFont.truetype(FONT, font_size)
+        lines = wrap_text(draw, text, font)
+        line_height = font_size + 15
+        if len(lines) * line_height <= 340 or font_size <= 30:
+            break
+        font_size -= 2
+    y = 635 - len(lines) * line_height // 2
+    for line in lines:
+        bbox = draw.textbbox((0, 0), line, font=font)
+        x = max(52, (WIDTH - (bbox[2] - bbox[0])) // 2)
+        draw.text((x, y), line, font=font, fill="white")
+        y += line_height
+    draw.text((54, 1135), f"{number:02d} / {total:02d}", font=small, fill=accent)
     image.save(output)
 
 
@@ -107,7 +157,7 @@ def main():
         png = work / f"{i:02}.png"
         mp4 = work / f"{i:02}.mp4"
         synthesize(text, speaker, wav)
-        make_card(text, i, len(segments), png)
+        make_card(text, i, len(segments), png, segment.get("scene", "clock"))
         seconds = duration(wav) + 0.45
         run("ffmpeg", "-y", "-loop", "1", "-framerate", "24", "-i", str(png),
             "-i", str(wav), "-filter_complex", "[1:a]apad[a]",
