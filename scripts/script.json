@@ -2,28 +2,44 @@
   "title": "日本人が一生でスマホを見る時間は？",
   "segments": [
     {
-      "text": "人生の7年半、スマホに消えるとしたら？",
-      "scene": "phone"
+      "text": "もしスマホに人生の7年半を使っていたら？",
+      "scene": "phone",
+      "headline": "7.5年!?"
     },
     {
-      "text": "1日3時間見ると仮定してみよう。",
-      "scene": "clock"
+      "text": "1日3時間見ると仮定するよ。",
+      "scene": "battery",
+      "headline": "1日3時間"
     },
     {
-      "text": "1年で1095時間。",
-      "scene": "calendar"
+      "text": "1年では、3かける365で1095時間。",
+      "scene": "calendar",
+      "headline": "1095時間"
     },
     {
-      "text": "60年間なら、6万5700時間！",
-      "scene": "phone"
+      "text": "それを60年間続けると？",
+      "scene": "people",
+      "headline": "60年間"
     },
     {
-      "text": "なんと約2738日。7年半に相当！",
-      "scene": "clock"
+      "text": "合計、6万5700時間！",
+      "scene": "chart",
+      "headline": "65,700時間"
     },
     {
-      "text": "これは仮定の計算。あなたは1日何時間？",
-      "scene": "phone"
+      "text": "24時間で割ると、約2738日。",
+      "scene": "hourglass",
+      "headline": "2,738日"
+    },
+    {
+      "text": "つまり人生の約7年半！仮定の計算だよ。",
+      "scene": "sunrise",
+      "headline": "約7.5年"
+    },
+    {
+      "text": "あなたは1日何時間スマホを見る？",
+      "scene": "question",
+      "headline": "何時間？"
     }
   ]
 }
