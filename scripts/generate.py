@@ -37,7 +37,7 @@ def synthesize(text, speaker, output):
 
 def wrap_text(draw, text, font, max_width=590):
     result = []
-    for paragraph in text.split("\\n"):
+    for paragraph in text.split("\n"):
         line = ""
         for char in paragraph:
             trial = line + char
