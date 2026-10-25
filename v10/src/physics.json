@@ -1,0 +1,38 @@
+{
+  "initialEnergyJ": 555.39,
+  "bowlingComparison": {
+    "heightM": 12,
+    "ballMassKg": 4.72,
+    "energyJ": 555.6
+  },
+  "base": {
+    "peakHeightM": 887.82,
+    "apexTimeS": 10.542,
+    "samples": [
+      {
+        "t": 0,
+        "h": 0,
+        "v": 330
+      },
+      {
+        "t": 10.542,
+        "h": 887.82,
+        "v": 0
+      }
+    ]
+  },
+  "sensitivity": [
+    {
+      "cd": 0.3,
+      "heightM": 1170.62
+    },
+    {
+      "cd": 0.45,
+      "heightM": 887.82
+    },
+    {
+      "cd": 1,
+      "heightM": 496.42
+    }
+  ]
+}
