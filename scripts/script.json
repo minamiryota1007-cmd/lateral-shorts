@@ -1,45 +1,45 @@
 {
-  "title": "日本人が一生でスマホを見る時間は？",
+  "title": "日本中の靴を横一列に並べたら？",
   "segments": [
     {
-      "text": "もしスマホに人生の7年半を使っていたら？",
-      "scene": "phone",
-      "headline": "7.5年!?"
+      "text": "日本中の靴を並べると、地球を約7.5周！",
+      "scene": "earth",
+      "headline": "地球7.5周!?"
     },
     {
-      "text": "1日3時間見ると仮定するよ。",
-      "scene": "battery",
-      "headline": "1日3時間"
+      "text": "日本の人口を約1億2000万人と仮定。",
+      "scene": "japan",
+      "headline": "1.2億人"
     },
     {
-      "text": "1年では、3かける365で1095時間。",
-      "scene": "calendar",
-      "headline": "1095時間"
+      "text": "1人が靴を5足持っているとする。",
+      "scene": "shoes",
+      "headline": "1人5足"
     },
     {
-      "text": "それを60年間続けると？",
-      "scene": "people",
-      "headline": "60年間"
+      "text": "左右で2個だから、全部で12億個！",
+      "scene": "shoe_line",
+      "headline": "12億個"
     },
     {
-      "text": "合計、6万5700時間！",
-      "scene": "chart",
-      "headline": "65,700時間"
+      "text": "靴1個を25センチとして一直線に並べる。",
+      "scene": "shoes",
+      "headline": "1個25cm"
     },
     {
-      "text": "24時間で割ると、約2738日。",
-      "scene": "hourglass",
-      "headline": "2,738日"
+      "text": "すると全長は、なんと30万キロ！",
+      "scene": "shoe_line",
+      "headline": "30万km"
     },
     {
-      "text": "つまり人生の約7年半！仮定の計算だよ。",
-      "scene": "sunrise",
-      "headline": "約7.5年"
+      "text": "地球1周4万キロで割ると、約7.5周！",
+      "scene": "earth",
+      "headline": "約7.5周"
     },
     {
-      "text": "あなたは1日何時間スマホを見る？",
+      "text": "これは仮定の計算。あなたは靴、何足持ってる？",
       "scene": "question",
-      "headline": "何時間？"
+      "headline": "何足ある？"
     }
   ]
 }
