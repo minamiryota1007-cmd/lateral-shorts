@@ -30,7 +30,7 @@ def synthesize(text, speaker, output):
     req = urllib.request.Request(BASE + "/audio_query?" + params, data=b"", method="POST")
     with urllib.request.urlopen(req, timeout=120) as response:
         query = json.loads(response.read())
-    query["speedScale"] = 1.18
+    query["speedScale"] = 1.4
     params = urllib.parse.urlencode({"speaker": speaker})
     output.write_bytes(request("/synthesis?" + params, query))
 
@@ -243,11 +243,11 @@ def main():
         synthesize(text, speaker, wav)
         make_card(text, i, len(segments), png, segment.get("scene", "clock"), segment.get("headline", ""))
         seconds = duration(wav) + 0.45
-        run("ffmpeg", "-y", "-loop", "1", "-framerate", "24", "-i", str(png),
-            "-i", str(wav), "-filter_complex", "[0:v]scale=792:1408,zoompan=z='min(zoom+0.0007,1.10)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=720x1280:fps=24,format=yuv420p[v];[1:a]apad[a]",
+        run("ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(png),
+            "-i", str(wav), "-filter_complex", "[0:v]scale=792:1408,zoompan=z='min(zoom+0.0007,1.10)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=720x1280:fps=30,format=yuv420p[v];[1:a]apad[a]",
             "-map", "[v]", "-map", "[a]", "-t", f"{seconds:.3f}",
-            "-c:v", "libx264", "-preset", "ultrafast", "-crf", "27",
-            "-pix_fmt", "yuv420p", "-r", "24", "-c:a", "aac",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac",
             "-b:a", "128k", "-ar", "44100", str(mp4))
         clips.append(mp4)
     manifest = work / "concat.txt"
@@ -255,7 +255,21 @@ def main():
     final = out / "lateral-short.mp4"
     run("ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(manifest),
         "-c", "copy", "-movflags", "+faststart", str(final))
-    print(f"Video ready: {final} ({duration(final):.1f} seconds)")
+    # Normalize the completed clip to precisely 20 seconds at 30 fps.
+    # Speed both audio and video together, rather than cutting narration.
+    raw_seconds = duration(final)
+    factor = raw_seconds / 20.0
+    normalized = out / "normalized.mp4"
+    run("ffmpeg", "-y", "-i", str(final),
+        "-filter_complex",
+        f"[0:v]setpts=(PTS-STARTPTS)/{factor:.8f},fps=30,trim=duration=20,setpts=PTS-STARTPTS[v];"
+        f"[0:a]atempo={factor:.8f},atrim=duration=20,apad=whole_dur=20[a]",
+        "-map", "[v]", "-map", "[a]", "-t", "20",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+        "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "160k",
+        "-movflags", "+faststart", str(normalized))
+    normalized.replace(final)
+    print(f"Video ready: {final} ({duration(final):.1f} seconds, 30 fps)")
 
 
 if __name__ == "__main__":
