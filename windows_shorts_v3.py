@@ -71,6 +71,68 @@ def voice_file(text, path):
     with wave.open(str(path), "rb") as f:
         return f.getnframes() / f.getframerate()
 
+
+def get_pixabay(shot):
+    """Optional Pixabay video, using a key from the local PC only."""
+    key = os.getenv("PIXABAY_API_KEY", "").strip()
+    if not key:
+        return None
+    dest = ROOT / (shot + "_pixabay.mp4")
+    if dest.exists() and dest.stat().st_size > 100000:
+        return dest
+    # Search metadata is cached for at least 24 hours per Pixabay API policy.
+    from datetime import datetime, timezone
+    cache = ROOT / (shot + "_pixabay_search.json")
+    try:
+        payload = None
+        if cache.exists() and (datetime.now(timezone.utc).timestamp() - cache.stat().st_mtime) < 86400:
+            payload = json.loads(cache.read_text(encoding="utf-8"))
+        if payload is None:
+            response = requests.get(
+                "https://pixabay.com/api/videos/",
+                params={
+                    "key": key,
+                    "q": SEARCHES[shot],
+                    "video_type": "film",
+                    "safesearch": "true",
+                    "per_page": 5,
+                },
+                timeout=25,
+            )
+            response.raise_for_status()
+            payload = response.json()
+            cache.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        candidates = []
+        for hit in payload.get("hits", []):
+            renditions = hit.get("videos", {})
+            item = renditions.get("medium") or renditions.get("small") or {}
+            if not item.get("url"):
+                continue
+            w, h = item.get("width", 0), item.get("height", 0)
+            # Favour vertical media but crop landscape clips when necessary.
+            score = (2 if h > w else 0) + (1 if min(w, h) >= 540 else 0)
+            candidates.append((score, hit, item))
+        if not candidates:
+            print("No Pixabay footage for:", shot)
+            return None
+        _, chosen, item = sorted(candidates, key=lambda e: e[0], reverse=True)[0]
+        with requests.get(item["url"], stream=True, timeout=60) as download:
+            download.raise_for_status()
+            with dest.open("wb") as output:
+                total = 0
+                for block in download.iter_content(128 * 1024):
+                    if block:
+                        total += len(block)
+                        if total > 120 * 1024 * 1024:
+                            raise RuntimeError("Pixabay download exceeds 120 MB")
+                        output.write(block)
+        print("Downloaded Pixabay footage:", shot, "source:", chosen.get("pageURL", ""))
+        return dest
+    except Exception as exc:
+        dest.unlink(missing_ok=True)
+        print("Pixabay unavailable:", shot, exc)
+        return None
+
 def get_pexels(shot):
     key = os.getenv("PEXELS_API_KEY", "").strip()
     if not key:
@@ -190,7 +252,7 @@ def render_scene(ffmpeg, sc, idx, duration, voice_sec, voice_path, work):
     user_clips = sorted((ROOT / shot).glob("*.mp4")) if (ROOT / shot).is_dir() else []
     direct = ROOT / (shot+".mp4")
     footage = (user_clips[0] if user_clips else
-               direct if direct.exists() else get_pexels(shot))
+               direct if direct.exists() else (get_pixabay(shot) or get_pexels(shot)))
     cap = cv2.VideoCapture(str(footage)) if footage else None
     photo = None if cap and cap.isOpened() else photo_fallback(shot)
     mode = "REAL VIDEO" if cap and cap.isOpened() else "PHOTO MOTION" if photo else "ANIMATED GRADIENT"
