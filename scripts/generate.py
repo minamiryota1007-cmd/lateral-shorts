@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BASE = os.environ.get("VOICEVOX_URL", "http://127.0.0.1:50021").rstrip("/")
 FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
 WIDTH, HEIGHT = 720, 1280
+TARGET_SECONDS = int(os.environ.get("TARGET_SECONDS", "30"))
 
 
 def request(path, data=None):
@@ -283,13 +284,13 @@ def main():
     # Normalize the completed clip to precisely 20 seconds at 30 fps.
     # Speed both audio and video together, rather than cutting narration.
     raw_seconds = duration(final)
-    factor = raw_seconds / 20.0
+    factor = raw_seconds / TARGET_SECONDS
     normalized = out / "normalized.mp4"
     run("ffmpeg", "-y", "-i", str(final),
         "-filter_complex",
-        f"[0:v]setpts=(PTS-STARTPTS)/{factor:.8f},fps=30,trim=duration=20,setpts=PTS-STARTPTS[v];"
-        f"[0:a]atempo={factor:.8f},atrim=duration=20,apad=whole_dur=20[a]",
-        "-map", "[v]", "-map", "[a]", "-t", "20",
+        f"[0:v]setpts=(PTS-STARTPTS)/{factor:.8f},fps=30,trim=duration={TARGET_SECONDS},setpts=PTS-STARTPTS[v];"
+        f"[0:a]atempo={factor:.8f},atrim=duration={TARGET_SECONDS},apad=whole_dur={TARGET_SECONDS}[a]",
+        "-map", "[v]", "-map", "[a]", "-t", str(TARGET_SECONDS),
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
         "-pix_fmt", "yuv420p", "-r", "30", "-c:a", "aac", "-b:a", "160k",
         "-movflags", "+faststart", str(normalized))
