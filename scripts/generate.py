@@ -197,6 +197,8 @@ def make_card(text, number, total, output, scene="clock", headline=""):
     draw.text((54, 1125), f"{number:02d} / {total:02d}", font=small, fill=accent)
     draw.rounded_rectangle((54, 1190, 666, 1201), radius=5, fill=(48, 76, 95))
     draw.rounded_rectangle((54, 1190, 54 + int(612*number/total), 1201), radius=5, fill=accent)
+    credit = ImageFont.truetype(FONT, 20)
+    draw.text((380, 1128), "VOICEVOX:ずんだもん", font=credit, fill=(165, 184, 195))
     image.save(output)
 
 
@@ -242,8 +244,8 @@ def main():
         make_card(text, i, len(segments), png, segment.get("scene", "clock"), segment.get("headline", ""))
         seconds = duration(wav) + 0.45
         run("ffmpeg", "-y", "-loop", "1", "-framerate", "24", "-i", str(png),
-            "-i", str(wav), "-filter_complex", "[1:a]apad[a]",
-            "-map", "0:v", "-map", "[a]", "-t", f"{seconds:.3f}",
+            "-i", str(wav), "-filter_complex", "[0:v]scale=792:1408,zoompan=z='min(zoom+0.0007,1.10)':x='(iw-iw/zoom)/2':y='(ih-ih/zoom)/2':d=1:s=720x1280:fps=24,format=yuv420p[v];[1:a]apad[a]",
+            "-map", "[v]", "-map", "[a]", "-t", f"{seconds:.3f}",
             "-c:v", "libx264", "-preset", "ultrafast", "-crf", "27",
             "-pix_fmt", "yuv420p", "-r", "24", "-c:a", "aac",
             "-b:a", "128k", "-ar", "44100", str(mp4))
