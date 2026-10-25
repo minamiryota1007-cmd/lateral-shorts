@@ -79,6 +79,20 @@ def draw_scene(draw, scene, accent):
             x = 360 + 205 * math.sin(a)
             y = 570 - 205 * math.cos(a)
             draw.ellipse((x-7, y-7, x+7, y+7), fill="white")
+    elif scene == "phone":
+        draw.rounded_rectangle((185, 250, 535, 1030), radius=54, fill=(30, 45, 65), outline=accent, width=13)
+        draw.rounded_rectangle((212, 325, 508, 935), radius=18, fill=(58, 104, 141))
+        draw.rounded_rectangle((287, 280, 433, 296), radius=8, fill=(145, 175, 192))
+        for x, y in ((250, 380), (355, 380), (250, 485), (355, 485)):
+            draw.rounded_rectangle((x, y, x + 75, y + 75), radius=17, fill=(102, 194, 196))
+        draw.ellipse((344, 966, 376, 998), outline=(180, 215, 220), width=4)
+    elif scene == "calendar":
+        draw.rounded_rectangle((115, 340, 605, 880), radius=35, fill=(50, 91, 120), outline=accent, width=12)
+        draw.rectangle((125, 455, 595, 465), fill=accent)
+        for row in range(4):
+            for col in range(5):
+                x, y = 165 + col * 87, 510 + row * 82
+                draw.rounded_rectangle((x, y, x + 48, y + 48), radius=8, fill=(137, 191, 206))
     elif scene == "office":
         for x, top, width in ((55, 480, 185), (265, 300, 190), (475, 405, 185)):
             draw.rectangle((x, top, x + width, 1000), fill=(46, 92, 120), outline=accent, width=4)
