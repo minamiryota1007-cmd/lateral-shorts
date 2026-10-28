@@ -1,0 +1,30 @@
+name: Penguin motion short
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - name: Start VOICEVOX
+        run: |
+          docker run -d --name voicevox -p 127.0.0.1:50021:50021 voicevox/voicevox_engine:cpu-latest
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:50021/version; then exit 0; fi
+            sleep 2
+          done
+          docker logs voicevox
+          exit 1
+      - name: Create short
+        run: python penguin_motion/render.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: penguin-motion-preview
+          path: output/penguin_motion.mp4
+          retention-days: 7
+          if-no-files-found: error
